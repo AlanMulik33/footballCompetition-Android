@@ -3,13 +3,12 @@
     <application
         android:allowBackup="true"
         android:label="Football Competition"
-        android:theme="@style/Theme.FootballCompetition"
-        android:hardwareAccelerated="false">
+        android:theme="@style/Theme.FootballCompetition">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:hardwareAccelerated="false">
+            android:windowSoftInputMode="adjustResize">
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

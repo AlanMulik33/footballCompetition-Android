@@ -9,7 +9,10 @@ let app = {
   cupDraft: null,
   competitions: [],
   historyFilter: 'all',
-  selectedCompetitionId: null
+  selectedCompetitionId: null,
+  historyDeleteMode: false,
+  selectedHistoryIds: [],
+  pendingDeleteIds: []
 };
 
 const defaultLeagueNames = ['Tim 1', 'Tim 2', 'Tim 3'];
@@ -218,6 +221,9 @@ function syncSelectValues() {
   $$('.bye-select').forEach(sel => {
     if (app.cupDraft) sel.value = app.cupDraft.bye || '';
   });
+  $$('.cup-bye-select').forEach(sel => {
+    if (app.cupDraft) sel.value = (app.cupDraft.byes || [])[Number(sel.dataset.index)] || '';
+  });
 }
 
 function updateDraftMatch(type, index, side, value) {
@@ -303,7 +309,8 @@ function generateCupDraft() {
       app.cupDraft = {
         mode,
         bye: shuffled[2],
-        matches: [{ id: uid('match'), stage: 'Ronde Awal', phase: 'knockout', round: 1, home: shuffled[0], away: shuffled[1], homeScore: null, awayScore: null, status: 'Belum' }]
+        byes: [shuffled[2]],
+        matches: [{ id: uid('match'), stage: 'Ronde 1', phase: 'knockout', round: 1, home: shuffled[0], away: shuffled[1], homeScore: null, awayScore: null, status: 'Belum' }]
       };
     } else {
       const matches = [];
@@ -345,19 +352,20 @@ function renderCupDraft() {
     return;
   }
   if (app.cupDraft.mode === 'knockout') {
-    info.textContent = 'Preview knockout. Untuk 3 tim, pilih 2 tim main duluan dan 1 tim bye.';
+    info.textContent = 'Preview knockout. Bracket mengikuti urutan ini dan tidak diacak ulang setelah cup dimulai.';
+    const byes = app.cupDraft.byes || (app.cupDraft.bye ? [app.cupDraft.bye] : []);
     let byeHtml = '';
-    const byeValue = app.cupDraft.bye || (app.cupDraft.byes || []).join(', ');
-    if (names.length === 3) {
-      const options = names.map(name => `<option value="${escapeAttr(name)}">${escapeHtml(name)}</option>`).join('');
-      byeHtml = `
+    if (byes.length) {
+      const options = (selectedValue) => names.map(name => {
+        const selected = name === selectedValue ? ' selected' : '';
+        return `<option value="${escapeAttr(name)}"${selected}>${escapeHtml(name)}</option>`;
+      }).join('');
+      byeHtml = byes.map((bye, index) => `
         <div class="match-card">
-          <div class="match-top"><span>Tim Bye</span><span class="badge wait">Menunggu</span></div>
-          <select class="text-input bye-select">${options}</select>
+          <div class="match-top"><span>Tim Bye ${byes.length > 1 ? index + 1 : ''}</span><span class="badge wait">Menunggu ronde berikutnya</span></div>
+          <select class="text-input cup-bye-select" data-index="${index}">${options(bye)}</select>
         </div>
-      `;
-    } else if (byeValue) {
-      byeHtml = `<div class="hint-box">Bye: ${escapeHtml(byeValue)}</div>`;
+      `).join('');
     }
     box.innerHTML = app.cupDraft.matches.map((match, index) => matchEditorCard(match, index, names, 'cup')).join('') + byeHtml;
   } else {
@@ -374,6 +382,15 @@ function renderCupDraft() {
 function updateCupBye(value) {
   if (!app.cupDraft) return;
   app.cupDraft.bye = value;
+  app.cupDraft.byes = [value];
+}
+
+function updateCupByeList(index, value) {
+  if (!app.cupDraft) return;
+  const byes = app.cupDraft.byes || [];
+  byes[index] = value;
+  app.cupDraft.byes = byes;
+  if (index === 0) app.cupDraft.bye = value;
 }
 
 function validateCupDraft() {
@@ -385,10 +402,16 @@ function validateCupDraft() {
     if (!match.home || !match.away) return 'Ada pertandingan yang timnya kosong.';
     if (match.home === match.away) return 'Tim tidak boleh melawan dirinya sendiri.';
   }
-  if (app.cupDraft.mode === 'knockout' && teams.length === 3) {
-    const used = [app.cupDraft.matches[0]?.home, app.cupDraft.matches[0]?.away, app.cupDraft.bye];
-    const unique = new Set(used);
-    if (unique.size !== 3) return 'Untuk cup 3 tim, tim main awal dan tim bye harus berbeda semua.';
+  if (app.cupDraft.mode === 'knockout') {
+    const byes = app.cupDraft.byes || (app.cupDraft.bye ? [app.cupDraft.bye] : []);
+    const used = [
+      ...app.cupDraft.matches.flatMap(match => [match.home, match.away]),
+      ...byes
+    ];
+    if (used.length !== teams.length) return 'Jumlah tim di match + bye harus sama dengan daftar tim.';
+    const uniqueUsed = new Set(used);
+    if (uniqueUsed.size !== teams.length) return 'Ada tim knockout yang dobel atau belum masuk bracket.';
+    if (used.some(name => !teams.includes(name))) return 'Ada tim di bracket yang tidak ada di daftar tim.';
   }
   return '';
 }
@@ -405,7 +428,8 @@ function startCup() {
     createdAt: new Date().toISOString(),
     teams,
     matches: app.cupDraft.matches.map((m, i) => ({ ...m, id: uid('match'), order: i + 1 })),
-    byes: app.cupDraft.bye ? [app.cupDraft.bye] : (app.cupDraft.byes || []),
+    byes: app.cupDraft.byes || (app.cupDraft.bye ? [app.cupDraft.bye] : []),
+    initialByes: app.cupDraft.byes || (app.cupDraft.bye ? [app.cupDraft.bye] : []),
     groups: app.cupDraft.groups || null,
     champion: null
   };
@@ -421,26 +445,105 @@ function startCup() {
 
 function renderHistory() {
   const list = $('#historyList');
+  const deleteBar = $('#deleteBar');
+  const deleteCount = $('#deleteCount');
+  const deleteToggle = $('#toggleDeleteHistory');
+
   let comps = [...app.competitions];
   if (app.historyFilter !== 'all') comps = comps.filter(c => c.type === app.historyFilter);
+
+  app.selectedHistoryIds = app.selectedHistoryIds.filter(id => app.competitions.some(c => c.id === id));
+
+  deleteBar.classList.toggle('hidden', !app.historyDeleteMode);
+  deleteCount.textContent = `${app.selectedHistoryIds.length} dipilih`;
+  deleteToggle.textContent = app.historyDeleteMode ? 'Selesai' : 'Pilih Hapus';
+
   if (!comps.length) {
     list.innerHTML = '<div class="empty">Belum ada riwayat kompetisi.</div>';
+    if (app.historyDeleteMode) exitHistoryDeleteMode(false);
     return;
   }
+
   list.innerHTML = comps.map(comp => {
     const done = comp.matches.filter(m => m.status === 'Selesai').length;
+    const checked = app.selectedHistoryIds.includes(comp.id) ? ' checked' : '';
+    const itemClass = app.historyDeleteMode ? 'history-item delete-pick' : 'history-item open-detail';
+    const tag = app.historyDeleteMode ? 'div' : 'button';
+    const typeAttr = app.historyDeleteMode ? '' : ' type="button"';
+    const pickHtml = app.historyDeleteMode ? `<label class="delete-check"><input class="history-check" data-id="${comp.id}" type="checkbox"${checked} /><span>Pilih</span></label>` : '<span class="tap-hint">Lihat detail</span>';
     return `
-      <button class="history-item open-detail" data-id="${comp.id}" type="button">
-        <strong>${escapeHtml(comp.name)}</strong>
-        <p>${comp.type}${comp.cupMode ? ` • ${comp.cupMode === 'group' ? 'Grup + Gugur' : 'Knockout'}` : ''}</p>
+      <${tag} class="${itemClass}" data-id="${comp.id}"${typeAttr}>
+        <div class="history-main">
+          <div>
+            <strong>${escapeHtml(comp.name)}</strong>
+            <p>${comp.type}${comp.cupMode ? ` • ${comp.cupMode === 'group' ? 'Grup + Gugur' : 'Knockout'}` : ''}</p>
+          </div>
+          ${pickHtml}
+        </div>
         <div class="history-meta">
           <span class="badge">${comp.teams.length} tim</span>
           <span class="badge">${done}/${comp.matches.length} match</span>
           <span class="badge">${formatDate(comp.createdAt)}</span>
         </div>
-      </button>
+      </${tag}>
     `;
   }).join('');
+}
+
+function toggleHistoryDeleteMode() {
+  app.historyDeleteMode = !app.historyDeleteMode;
+  app.selectedHistoryIds = [];
+  renderHistory();
+}
+
+function exitHistoryDeleteMode(showMessage = true) {
+  app.historyDeleteMode = false;
+  app.selectedHistoryIds = [];
+  renderHistory();
+  if (showMessage) toast('Mode hapus dibatalkan.');
+}
+
+function toggleHistorySelection(id) {
+  if (!id) return;
+  if (app.selectedHistoryIds.includes(id)) {
+    app.selectedHistoryIds = app.selectedHistoryIds.filter(item => item !== id);
+  } else {
+    app.selectedHistoryIds.push(id);
+  }
+  renderHistory();
+}
+
+function deleteSelectedHistory() {
+  if (!app.selectedHistoryIds.length) return toast('Pilih riwayat yang mau dihapus dulu.');
+  app.pendingDeleteIds = [...app.selectedHistoryIds];
+  const selected = app.competitions.filter(c => app.pendingDeleteIds.includes(c.id));
+  const listHtml = selected.slice(0, 5).map(c => `<div>${escapeHtml(c.name)}</div>`).join('');
+  const extra = selected.length > 5 ? `<p>dan ${selected.length - 5} riwayat lainnya.</p>` : '';
+  $('#deleteModalBody').innerHTML = `
+    <p>Yakin mau menghapus <strong>${selected.length} riwayat</strong> ini?</p>
+    <div class="modal-list">${listHtml}</div>
+    ${extra}
+    <p style="margin-top:10px">Data yang dihapus tidak bisa dikembalikan.</p>
+  `;
+  $('#deleteModal').classList.remove('hidden');
+}
+
+function closeDeleteConfirm() {
+  app.pendingDeleteIds = [];
+  $('#deleteModal').classList.add('hidden');
+}
+
+function confirmDeleteHistory() {
+  if (!app.pendingDeleteIds.length) return closeDeleteConfirm();
+  const deleteIds = [...app.pendingDeleteIds];
+  app.competitions = app.competitions.filter(c => !deleteIds.includes(c.id));
+  save();
+  app.selectedCompetitionId = null;
+  app.historyDeleteMode = false;
+  app.selectedHistoryIds = [];
+  closeDeleteConfirm();
+  renderHistory();
+  toast('Riwayat terpilih dihapus.');
 }
 
 function renderDetail(id) {
@@ -512,8 +615,9 @@ function renderGroupTables(comp) {
 }
 
 function renderCupProgress(comp) {
-  const byes = comp.byes?.length ? `<p>Bye awal: ${comp.byes.map(escapeHtml).join(', ')}</p>` : '<p>Tidak ada bye awal.</p>';
-  return `<div class="detail-card"><h3>Progress Cup</h3>${byes}<p>${comp.champion ? `Juara: ${escapeHtml(comp.champion)}` : 'Juara belum ditentukan.'}</p></div>`;
+  const initialByes = comp.initialByes?.length ? `<p>Bye awal: ${comp.initialByes.map(escapeHtml).join(', ')}</p>` : '<p>Tidak ada bye awal.</p>';
+  const waiting = comp.byes?.length ? `<p>Menunggu ronde berikutnya: ${comp.byes.map(escapeHtml).join(', ')}</p>` : '<p>Tidak ada tim yang sedang bye.</p>';
+  return `<div class="detail-card"><h3>Progress Cup</h3>${initialByes}${waiting}<p>${comp.champion ? `Juara: ${escapeHtml(comp.champion)}` : 'Juara belum ditentukan.'}</p></div>`;
 }
 
 function renderMatches(comp) {
@@ -605,27 +709,51 @@ function progressCup(comp) {
   }
 
   const knockoutMatches = comp.matches.filter(m => m.phase === 'knockout');
-  const rounds = [...new Set(knockoutMatches.map(m => m.round))].sort((a, b) => a - b);
+  const rounds = [...new Set(knockoutMatches.map(m => m.round || 1))].sort((a, b) => a - b);
   const lastRound = rounds[rounds.length - 1];
-  const current = knockoutMatches.filter(m => m.round === lastRound);
+  const current = knockoutMatches
+    .filter(m => (m.round || 1) === lastRound)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+
   if (!current.length || !current.every(m => m.status === 'Selesai')) return;
-  const existingNext = knockoutMatches.some(m => m.round === lastRound + 1);
+
+  const existingNext = knockoutMatches.some(m => (m.round || 1) === lastRound + 1);
   if (existingNext) return;
+
   const winners = current.map(m => m.winner).filter(Boolean);
-  const availableByes = lastRound === 1 ? (comp.byes || []) : [];
-  const nextTeams = [...winners, ...availableByes];
+  const waitingByes = comp.byes || [];
+  const nextTeams = [...winners, ...waitingByes];
+
+  comp.byes = [];
+
   if (nextTeams.length === 1) {
     comp.champion = nextTeams[0];
     return;
   }
+
   const nextRoundName = nextTeams.length === 2 ? 'Final' : `Ronde ${lastRound + 1}`;
-  const shuffled = shuffle(nextTeams);
-  const nextMatches = [];
+  const teamsToPair = [...nextTeams];
   const nextByes = [];
-  for (let i = 0; i < shuffled.length; i += 2) {
-    if (shuffled[i + 1]) nextMatches.push(makeMatch(nextRoundName, 'knockout', shuffled[i], shuffled[i + 1], comp.matches.length + nextMatches.length + 1, lastRound + 1));
-    else nextByes.push(shuffled[i]);
+
+  // Bracket tidak diacak ulang. Kalau jumlah tim ganjil, tim pertama menunggu,
+  // sisanya dipasangkan sesuai urutan pemenang + bye.
+  // Contoh 5 tim: Winner Match 1 bye, Winner Match 2 vs Tim Bye awal, lalu Final.
+  if (teamsToPair.length % 2 === 1) {
+    nextByes.push(teamsToPair.shift());
   }
+
+  const nextMatches = [];
+  for (let i = 0; i < teamsToPair.length; i += 2) {
+    nextMatches.push(makeMatch(
+      nextRoundName,
+      'knockout',
+      teamsToPair[i],
+      teamsToPair[i + 1],
+      comp.matches.length + nextMatches.length + 1,
+      lastRound + 1
+    ));
+  }
+
   comp.matches.push(...nextMatches);
   comp.byes = nextByes;
 }
@@ -704,9 +832,19 @@ function bindEvents() {
     const filter = event.target.closest('.filter');
     if (filter) {
       app.historyFilter = filter.dataset.filter;
+      app.selectedHistoryIds = [];
       $$('.filter').forEach(btn => btn.classList.toggle('active', btn === filter));
       renderHistory();
     }
+
+    if (event.target.id === 'toggleDeleteHistory') toggleHistoryDeleteMode();
+    if (event.target.id === 'cancelDeleteHistory') exitHistoryDeleteMode();
+    if (event.target.id === 'deleteSelectedHistory') deleteSelectedHistory();
+    if (event.target.id === 'cancelConfirmDelete') closeDeleteConfirm();
+    if (event.target.id === 'confirmDeleteHistory') confirmDeleteHistory();
+
+    const deletePick = event.target.closest('.delete-pick');
+    if (deletePick && !event.target.classList.contains('history-check')) toggleHistorySelection(deletePick.dataset.id);
 
     const openDetail = event.target.closest('.open-detail');
     if (openDetail) { renderDetail(openDetail.dataset.id); go('detailScreen'); }
@@ -714,15 +852,6 @@ function bindEvents() {
 
     const saveScoreBtn = event.target.closest('.save-score');
     if (saveScoreBtn) saveScore(saveScoreBtn.dataset.comp, saveScoreBtn.dataset.match);
-
-    if (event.target.id === 'clearHistory') {
-      if (confirm('Hapus semua riwayat kompetisi?')) {
-        app.competitions = [];
-        save();
-        renderHistory();
-        toast('Riwayat dihapus.');
-      }
-    }
   });
 
   document.addEventListener('input', (event) => {
@@ -730,8 +859,10 @@ function bindEvents() {
   });
 
   document.addEventListener('change', (event) => {
+    if (event.target.classList.contains('history-check')) toggleHistorySelection(event.target.dataset.id);
     if (event.target.classList.contains('draft-select')) updateDraftMatch(event.target.dataset.type, Number(event.target.dataset.index), event.target.dataset.side, event.target.value);
     if (event.target.classList.contains('bye-select')) updateCupBye(event.target.value);
+    if (event.target.classList.contains('cup-bye-select')) updateCupByeList(Number(event.target.dataset.index), event.target.value);
     if (event.target.id === 'cupMode') { app.cupDraft = null; renderCupDraft(); }
   });
 }

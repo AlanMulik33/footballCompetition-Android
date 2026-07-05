@@ -39,11 +39,6 @@
             <span>Lihat hasil per kompetisi.</span>
           </button>
         </div>
-
-        <div class="soft-card compact">
-          <strong>Mode Mobile Lite</strong>
-          <p>Tampilan dibuat per layar agar lebih ringan untuk HP lama dan WebView Android.</p>
-        </div>
       </section>
 
       <section id="leagueScreen" class="screen">
@@ -125,12 +120,19 @@
             <h2>Riwayat</h2>
             <p>Pilih satu kompetisi untuk lihat detail.</p>
           </div>
-          <button id="clearHistory" class="danger-btn" type="button">Hapus</button>
+          <button id="toggleDeleteHistory" class="danger-btn" type="button">Pilih Hapus</button>
         </div>
         <div class="filter-tabs">
           <button class="filter active" data-filter="all" type="button">Semua</button>
           <button class="filter" data-filter="Liga" type="button">Liga</button>
           <button class="filter" data-filter="Cup" type="button">Cup</button>
+        </div>
+        <div id="deleteBar" class="delete-bar hidden">
+          <span id="deleteCount">0 dipilih</span>
+          <div class="delete-actions">
+            <button id="cancelDeleteHistory" class="ghost-btn" type="button">Batal</button>
+            <button id="deleteSelectedHistory" class="danger-btn" type="button">Hapus Dipilih</button>
+          </div>
         </div>
         <div id="historyList" class="history-list"></div>
       </section>
@@ -147,6 +149,17 @@
       <button class="nav-btn" data-go="cupScreen" type="button">🥇<span>Cup</span></button>
       <button class="nav-btn" data-go="historyScreen" type="button">📋<span>Riwayat</span></button>
     </nav>
+  </div>
+
+  <div id="deleteModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle">
+    <div class="modal-card">
+      <h3 id="deleteModalTitle">Konfirmasi Hapus</h3>
+      <div id="deleteModalBody" class="modal-body"></div>
+      <div class="modal-actions">
+        <button id="cancelConfirmDelete" class="ghost-btn" type="button">Batal</button>
+        <button id="confirmDeleteHistory" class="danger-btn" type="button">Ya, Hapus</button>
+      </div>
+    </div>
   </div>
 
   <div id="toast" class="toast"></div>

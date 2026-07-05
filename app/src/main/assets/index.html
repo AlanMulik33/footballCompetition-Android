@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Custom Football League</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="brand-icon">⚽</div>
+        <div>
+          <h1>Custom Football League</h1>
+          <p>Simulator liga dan cup custom</p>
+        </div>
+      </div>
+
+      <nav class="tabs" aria-label="Menu utama">
+        <button class="tab-btn active" data-tab="home">Home</button>
+        <button class="tab-btn" data-tab="liga">Liga</button>
+        <button class="tab-btn" data-tab="cup">Cup</button>
+        <button class="tab-btn" data-tab="hasil">Hasil</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <section id="home" class="page active">
+      <div class="hero card">
+        <div class="hero-content">
+          <span class="pill">Football custom</span>
+          <h2>Buat liga dan cup dengan jadwal yang bisa diacak lalu diedit manual.</h2>
+          <p>
+            Susun tim, acak jadwal beberapa kali, ubah pasangan pertandingan secara manual,
+            lalu mulai kompetisi kalau susunannya sudah cocok.
+          </p>
+          <div class="actions">
+            <button class="primary" data-jump="liga">Buat Liga</button>
+            <button class="secondary" data-jump="cup">Buat Cup</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="feature-grid">
+        <article class="card feature-card">
+          <strong>1. Input Tim</strong>
+          <p>Nama tim dibuat dalam kolom supaya mudah diedit, ditambah, dan dihapus.</p>
+        </article>
+        <article class="card feature-card">
+          <strong>2. Acak & Edit</strong>
+          <p>Jadwal bisa diacak dulu, lalu Home/Away dan urutannya bisa diubah manual.</p>
+        </article>
+        <article class="card feature-card">
+          <strong>3. Riwayat Per Kompetisi</strong>
+          <p>Hasil disimpan per Liga/Cup. Klik satu kompetisi untuk melihat semua pertandingan.</p>
+        </article>
+      </div>
+
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <h3>Kompetisi Terakhir</h3>
+            <p class="muted">Data dari Liga/Cup yang sudah dimulai.</p>
+          </div>
+        </div>
+        <div id="homeLatest" class="empty">Belum ada kompetisi.</div>
+      </section>
+    </section>
+
+    <section id="liga" class="page">
+      <div class="page-title">
+        <div>
+          <h2>Liga</h2>
+          <p class="muted">Minimal 3 tim. Sistem double home-away, seri diperbolehkan.</p>
+        </div>
+        <button class="danger" id="resetLeagueBtn">Reset Liga Aktif</button>
+      </div>
+
+      <section class="card step-card">
+        <div class="step-label">Langkah 1</div>
+        <div class="section-head">
+          <div>
+            <h3>Masukkan Tim Liga</h3>
+            <p class="muted">Ubah nama tim, tambah tim, atau hapus tim. Preview jadwal akan dibersihkan jika tim berubah.</p>
+          </div>
+          <div class="actions compact">
+            <button class="secondary" id="addLeagueTeamBtn">+ Tim</button>
+            <button class="ghost" id="shuffleLeagueTeamsBtn">Acak Tim</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="team-table">
+            <thead>
+              <tr>
+                <th>No</th>
+                <th>Nama Tim</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="leagueTeamRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card step-card">
+        <div class="step-label">Langkah 2</div>
+        <div class="section-head">
+          <div>
+            <h3>Preview & Edit Jadwal Liga</h3>
+            <p class="muted">Klik acak jadwal, lalu ubah Home/Away atau geser urutan pertandingan sesuai keinginan.</p>
+          </div>
+          <div class="actions compact">
+            <button class="primary" id="previewLeagueBtn">Acak Jadwal</button>
+            <button class="secondary" id="startLeagueBtn">Mulai Liga</button>
+            <button class="ghost" id="clearLeaguePreviewBtn">Bersihkan</button>
+          </div>
+        </div>
+        <div id="leaguePreview" class="empty">Belum ada preview jadwal.</div>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <h3>Liga Aktif</h3>
+            <p class="muted">Masukkan skor. Seri boleh karena ini liga.</p>
+          </div>
+          <button class="secondary" id="randomLeagueScoreBtn">Isi Skor Random</button>
+        </div>
+        <div id="leagueStatus" class="status">Belum ada liga aktif.</div>
+      </section>
+
+      <section class="card">
+        <h3>Klasemen Liga</h3>
+        <div id="leagueTable" class="table-wrap empty">Belum ada klasemen.</div>
+      </section>
+
+      <section class="card">
+        <h3>Jadwal & Skor Liga Aktif</h3>
+        <div id="leagueMatches" class="match-list empty">Belum ada jadwal aktif.</div>
+      </section>
+    </section>
+
+    <section id="cup" class="page">
+      <div class="page-title">
+        <div>
+          <h2>Cup</h2>
+          <p class="muted">Gugur langsung minimal 3 tim. Fase grup + gugur minimal 8 tim.</p>
+        </div>
+        <button class="danger" id="resetCupBtn">Reset Cup Aktif</button>
+      </div>
+
+      <section class="card step-card">
+        <div class="step-label">Langkah 1</div>
+        <div class="form-grid">
+          <label class="field">
+            <span>Mode Cup</span>
+            <select id="cupMode">
+              <option value="knockout">Gugur langsung — minimal 3 tim</option>
+              <option value="group">Fase grup + gugur — minimal 8 tim, 2 grup</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="section-head mt">
+          <div>
+            <h3>Masukkan Tim Cup</h3>
+            <p class="muted">Untuk 3 tim knockout, satu tim bisa dibuat menunggu/bye.</p>
+          </div>
+          <div class="actions compact">
+            <button class="secondary" id="addCupTeamBtn">+ Tim</button>
+            <button class="ghost" id="shuffleCupTeamsBtn">Acak Tim</button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="team-table">
+            <thead>
+              <tr>
+                <th>No</th>
+                <th>Nama Tim</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="cupTeamRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card step-card">
+        <div class="step-label">Langkah 2</div>
+        <div class="section-head">
+          <div>
+            <h3>Preview & Edit Cup</h3>
+            <p class="muted">Acak dulu. Untuk knockout, kamu bisa tentukan siapa bertemu duluan dan siapa bye.</p>
+          </div>
+          <div class="actions compact">
+            <button class="primary" id="previewCupBtn">Acak Cup</button>
+            <button class="secondary" id="startCupBtn">Mulai Cup</button>
+            <button class="ghost" id="clearCupPreviewBtn">Bersihkan</button>
+          </div>
+        </div>
+        <div id="cupPreview" class="empty">Belum ada preview cup.</div>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <h3>Cup Aktif</h3>
+            <p class="muted">Fase grup boleh seri. Babak gugur tidak boleh seri.</p>
+          </div>
+          <button class="secondary" id="randomCupScoreBtn">Isi Skor Random</button>
+        </div>
+        <div id="cupStatus" class="status">Belum ada cup aktif.</div>
+      </section>
+
+      <section class="card" id="groupSection">
+        <div class="section-head">
+          <div>
+            <h3>Fase Grup</h3>
+            <p class="muted">Dua tim terbaik dari tiap grup lolos ke semifinal.</p>
+          </div>
+          <button class="primary hidden" id="createSemiBtn">Buat Semifinal</button>
+        </div>
+        <div id="groupContent" class="empty">Belum ada fase grup.</div>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <h3>Bracket Gugur</h3>
+            <p class="muted">Ronde berikutnya dibuat setelah ronde aktif selesai.</p>
+          </div>
+          <button class="primary hidden" id="nextRoundBtn">Buat Ronde Berikutnya</button>
+        </div>
+        <div id="cupBracket" class="empty">Belum ada bracket.</div>
+      </section>
+    </section>
+
+    <section id="hasil" class="page">
+      <div class="page-title">
+        <div>
+          <h2>Hasil / Riwayat</h2>
+          <p class="muted">Pilih salah satu Liga/Cup untuk melihat pertandingan lengkapnya.</p>
+        </div>
+        <button class="danger" id="clearHistoryBtn">Hapus Riwayat</button>
+      </div>
+
+      <div class="history-layout">
+        <section class="card history-sidebar">
+          <h3>Daftar Kompetisi</h3>
+          <div class="filter-row">
+            <button class="filter-btn active" data-type="all">Semua</button>
+            <button class="filter-btn" data-type="Liga">Liga</button>
+            <button class="filter-btn" data-type="Cup">Cup</button>
+          </div>
+          <div id="competitionList" class="competition-list empty">Belum ada riwayat kompetisi.</div>
+        </section>
+
+        <section class="card history-detail-card">
+          <div id="competitionDetail" class="empty">Pilih kompetisi untuk melihat detail.</div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="script.js"></script>
+</body>
+</html>
